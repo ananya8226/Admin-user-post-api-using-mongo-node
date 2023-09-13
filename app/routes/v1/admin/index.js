@@ -1,0 +1,16 @@
+const { adminLogin, changeUserStatus, changePostStatus, getPostList, getUserList, getUsersWithPost } = require('../../../controller/admin')
+const { logout } = require('../../../controller/auth')
+const { changePassword } = require('../../../controller/user')
+const { loginValidator, passwordIsValid, emailExists, verifyApiKey, isAdmin, verifyAuthToken, sessionIsValid, userEmailExists } = require('../../../middleware/auth')
+const { userIsValid, postExists } = require('../../../middleware/user')
+
+const router = require('express').Router()
+router.patch('/login', verifyApiKey, loginValidator, emailExists, passwordIsValid, isAdmin, adminLogin)
+router.patch('/change-password', verifyApiKey, verifyAuthToken, userIsValid, isAdmin, changePassword)
+router.patch('/logout', verifyApiKey, verifyAuthToken, sessionIsValid, isAdmin, logout)
+router.patch('/change-user-status', verifyApiKey, verifyAuthToken, sessionIsValid, userEmailExists, isAdmin, changeUserStatus)
+router.patch('/change-post-status', verifyApiKey, verifyAuthToken, sessionIsValid, isAdmin, postExists, changePostStatus)
+router.get('/get-post-list', verifyApiKey, verifyAuthToken, sessionIsValid, isAdmin, getPostList)
+router.get('/get-user-list', verifyApiKey, verifyAuthToken, sessionIsValid, isAdmin, getUserList)
+router.get('/get-users-with-post', verifyApiKey, verifyAuthToken, sessionIsValid, isAdmin, getUsersWithPost)
+module.exports = router
