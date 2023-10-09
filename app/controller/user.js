@@ -82,27 +82,60 @@ exports.follow = async (req, res) => {
   }
 }
 
+// exports.getFollower = async (req, res) => {
+//   try {
+//     const followerIds = await Follower.find({ followingId: req.user._id }).distinct('followerId').lean()
+//     const condition = { _id: { $in: followerIds } }
+//     let { searchKey, searchValue, sort, order, limit, page } = req.query
+//     if (searchValue) {
+//       if (searchKey) {
+//         condition[searchKey] = new RegExp(searchValue, 'i')
+//       } else {
+//         condition.$or = [{ fullname: new RegExp(searchValue, 'i') }, { email: new RegExp(searchValue, 'i') }]
+//       }
+//     }
+//     const sortCondition = {}
+//     if (sort) sortCondition[sort] = order === 'asc' ? 1 : -1
+//     else sort = []
+//     const skip = (page - 1) * limit
+//     limit = limit ? parseInt(limit) : null
+//     const attr = { _id: 1, fullname: 1, email: 1, phone: 1 }
+//     const followerList = await commonService.getManyByCondition(User, condition, sortCondition, skip, limit, attr)
+//     return response.success(req, res, { msgCode: 'FOLLOWING LIST FETCHED SUCCESSFULLY', followerList }, httpStatus.OK)
+//   } catch (error) {
+//     return response.error(req, res, { msgCode: 'INTERNAL SERVER ERROR' }, httpStatus.INTERNAL_SERVER_ERROR)
+//   }
+// }
+
 exports.getFollower = async (req, res) => {
   try {
-    const followerIds = await Follower.find({ followingId: req.user._id }).distinct('followerId').lean()
-    const condition = { _id: { $in: followerIds } }
-    let { searchKey, searchValue, sort, order, limit, page } = req.query
-    if (searchValue) {
-      if (searchKey) {
-        condition[searchKey] = new RegExp(searchValue, 'i')
-      } else {
-        condition.$or = [{ fullname: new RegExp(searchValue, 'i') }, { email: new RegExp(searchValue, 'i') }]
-      }
+    const { searchKey, searchValue, sort, limit, page } = req.query
+    const order = req.query.order || -1
+    const sortCondition = {
+      [(sort === '') ? 'fullname' : sort]: order
     }
-    const sortCondition = {}
-    if (sort) sortCondition[sort] = order === 'asc' ? 1 : -1
-    else sort = []
-    const skip = (page - 1) * limit
-    limit = limit ? parseInt(limit) : null
-    const attr = { _id: 1, fullname: 1, email: 1, phone: 1 }
-    const followerList = await commonService.getManyByCondition(User, condition, sortCondition, skip, limit, attr)
-    return response.success(req, res, { msgCode: 'FOLLOWING LIST FETCHED SUCCESSFULLY', followerList }, httpStatus.OK)
+    // if (sort) sortCondition[sort] = order === 'asc' ? 1 : -1
+    // else sort = {[]}
+    const followers = await Follower.aggregate([
+      { $match: { followingId: req.user._id } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'followerId',
+          foreignField: '_id',
+          pipeline: [{
+            $project: { fullname: 1, email: 1, phone: 1 }
+          }],
+          as: 'Following'
+        }
+      },
+      {
+        $sort: sortCondition
+      }
+    ])
+    return response.success(req, res, { msgCode: 'Success', followers }, httpStatus.OK)
   } catch (error) {
+    console.log(error)
     return response.error(req, res, { msgCode: 'INTERNAL SERVER ERROR' }, httpStatus.INTERNAL_SERVER_ERROR)
   }
 }
@@ -156,7 +189,7 @@ exports.getPostsWithUser = async (req, res) => {
     const followingIds = await Follower.find({ followerId: req.user._id }).distinct('followingId').lean()
     const postCondition = { userId: { $in: followingIds }, status: statusType.ACTIVE }
     const attr = { _id: 1, title: 1, userId: 1 }
-    const posts = await Post.find(postCondition, attr).populate('userId').populate('userId')
+    const posts = await Post.find(postCondition, attr).populate('userId')
     return response.success(req, res, { msgCode: 'FOLLOWING LIST WITH POSTS FETCHED SUCCESSFULLY', posts }, httpStatus.OK)
   } catch (error) {
     return response.error(req, res, { msgCode: 'INTERNAL SERVER ERROR' }, httpStatus.INTERNAL_SERVER_ERROR)
